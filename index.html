@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>TipSplit Pro - מחשבון טיפים לבר</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- XLSX (SheetJS) for Excel import/export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2f;
+      --text:#eaf0ff;
+      --muted:#a9b7da;
+      --line:rgba(255,255,255,.10);
+      --accent:#7c5cff;
+      --accent2:#22c55e;
+      --danger:#ef4444;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans Hebrew", "Heebo", sans-serif;
+      background:
+        radial-gradient(1100px 700px at 10% -10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(900px 600px at 95% 10%, rgba(34,197,94,.22), transparent 50%),
+        radial-gradient(700px 450px at 50% 110%, rgba(59,130,246,.18), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      padding:16px;
+    }
+
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size: clamp(20px, 3.8vw, 30px);
+      letter-spacing:.2px;
+      line-height:1.15;
+    }
+
+    .brand p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .cardHead{
+      padding:14px 14px 10px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .cardHead .title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .cardHead .title b{
+      font-size:15px;
+    }
+    .cardHead .title span{
+      color:var(--muted);
+      font-size:12.5px;
+    }
+
+    .cardBody{ padding:14px; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:10px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+
+    label{
+      color:var(--muted);
+      font-size:12.5px;
+    }
+
+    input, button{ font:inherit; }
+
+    input{
+      width:100%;
+      padding:11px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(10,16,30,.55);
+      color:var(--text);
+      outline:none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    input::placeholder{ color: rgba(233,240,255,.45); }
+    input:focus{
+      border-color: rgba(124,92,255,.7);
+      box-shadow: 0 0 0 3px rgba(124,92,255,.18);
+    }
+
+    .btnRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .btn{
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      cursor:pointer;
+      transition: transform .05s ease, background .15s ease, border-color .15s ease;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      white-space:nowrap;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.20); }
+
+    .btn.primary{
+      background: rgba(124,92,255,.20);
+      border-color: rgba(124,92,255,.45);
+    }
+    .btn.primary:hover{
+      background: rgba(124,92,255,.26);
+      border-color: rgba(124,92,255,.62);
+    }
+
+    .btn.good{
+      background: rgba(34,197,94,.16);
+      border-color: rgba(34,197,94,.42);
+    }
+
+    .btn.danger{
+      background: rgba(239,68,68,.14);
+      border-color: rgba(239,68,68,.42);
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size:12.5px;
+    }
+
+    .summary{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+    }
+
+    .sumCard{
+      background: rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius: 14px;
+      padding:12px;
+      min-height:74px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .sumCard span{ color: var(--muted); font-size:12.5px; }
+    .sumCard b{ font-size:16px; letter-spacing:.2px; }
+
+    .tableWrap{
+      overflow:auto;
+      border-radius: 16px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.12);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width: 1040px;
+    }
+
+    thead th{
+      position:sticky;
+      top:0;
+      background: rgba(15,26,47,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+      padding:10px;
+      text-align:right;
+      color: var(--muted);
+      font-size:12.5px;
+      font-weight:600;
+      white-space:nowrap;
+    }
+
+    tbody td{
+      border-top:1px solid rgba(255,255,255,.06);
+      padding:10px;
+      vertical-align:top;
+    }
+
+    tbody tr:hover{ background: rgba(255,255,255,.03); }
+
+    .rowControls{
+      display:flex;
+      gap:8px;
+      justify-content:flex-start;
+    }
+
+    .mini{
+      padding:8px 10px;
+      border-radius: 10px;
+      font-size:13px;
+    }
+
+    .num{ font-variant-numeric: tabular-nums; }
+
+    .status{
+      margin-top:10px;
+      color: var(--muted);
+      font-size:12.5px;
+      line-height:1.35;
+    }
+
+    .fileInput{ display:none; }
+
+    @media (max-width: 780px){
+      .summary{ grid-template-columns: 1fr; }
+      .cardHead{ align-items:flex-start; }
+      .btnRow{ justify-content:stretch; }
+      .btnRow .btn{ flex:1; justify-content:center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="brand">
+        <h1>TipSplit Pro</h1>
+        <p>מחשבון טיפים למנהל בר: חלוקה לפי שעות, מותאם מובייל, כולל ייבוא/ייצוא אקסל.</p>
+      </div>
+      <div class="pill" id="todayPill">תאריך: <span class="num" id="todayText"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="cardHead">
+        <div class="title">
+          <b>הגדרות כלליות</b>
+          <span>הזן סה״כ טיפים, הוסף עובדים, והמערכת תחשב אוטומטית.</span>
+        </div>
+        <div class="btnRow">
+          <button class="btn primary" id="installBtn" style="display:none;">⬇️ התקן אפליקציה</button>
+          <button class="btn primary" id="addRowBtn">+ הוסף עובד</button>
+          <button class="btn good" id="exportBtn">ייצוא לאקסל</button>
+          <button class="btn" id="importBtn">ייבוא מאקסל</button>
+          <input class="fileInput" id="filePicker" type="file" accept=".xlsx,.xls" />
+        </div>
+      </div>
+
+      <div class="cardBody">
+        <div class="grid">
+          <div class="field" style="grid-column: span 12;">
+            <label>סה״כ טיפים כולל (מספר)</label>
+            <input id="totalTips" inputmode="decimal" placeholder="לדוגמה: 1250" />
+          </div>
+
+          <div style="grid-column: span 12;">
+            <div class="summary">
+              <div class="sumCard">
+                <span>סה״כ שעות כלליות</span>
+                <b class="num" id="sumHours">0.00</b>
+              </div>
+              <div class="sumCard">
+                <span>כמה לשעה (מחושב)</span>
+                <b class="num" id="perHour">0.00</b>
+              </div>
+              <div class="sumCard">
+                <span>בקרת סה״כ חלוקה</span>
+                <b class="num" id="sumDistributed">0.00</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="status" id="statusText"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardHead">
+        <div class="title">
+          <b>עובדים</b>
+          <span>המערכת מחשבת לכל עובד: שעות × "כמה לשעה" המחושב הכללי.</span>
+        </div>
+      </div>
+
+      <div class="cardBody">
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px;">תאריך</th>
+                <th style="width:140px;">שם פרטי</th>
+                <th style="width:160px;">שם משפחה</th>
+                <th style="width:140px;">שעת הגעה</th>
+                <th style="width:140px;">עליה למשמרת</th>
+                <th style="width:140px;">ירידה ממשמרת</th>
+                <th style="width:130px;">סה״כ שעות</th>
+                <th style="width:140px;">כמה לשעה</th>
+                <th style="width:170px;">סכום כולל לעובד</th>
+                <th style="width:120px;">פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <div class="status">
+          הערה: אם הירידה מוקדמת מהעליה, המערכת מניחה שהמשמרת עברה חצות (למשל 22:00 → 03:00).
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const state = { rows: [] };
+
+    function isoToday() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function setToday() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      el('todayText').textContent = `${dd}.${mm}.${yyyy}`;
+    }
+
+    function parseNumber(v) {
+      if (v == null) return 0;
+      const s = String(v).trim().replace(/,/g,'');
+      if (!s) return 0;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function fmt2(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return '0.00';
+      return x.toFixed(2);
+    }
+
+    function timeToMinutes(t) {
+      if (!t) return null;
+      const m = String(t).match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isInteger(hh) || !Number.isInteger(mm)) return null;
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return hh*60 + mm;
+    }
+
+    function calcDurationHours(startHHMM, endHHMM) {
+      const a = timeToMinutes(startHHMM);
+      const b = timeToMinutes(endHHMM);
+      if (a == null || b == null) return 0;
+      let diff = b - a;
+      if (diff < 0) diff += 24*60;
+      return diff / 60;
+    }
+
+    function addRow(data = {}) {
+      const row = {
+        id: crypto.randomUUID(),
+        date: data.date || isoToday(),
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        arrival: data.arrival || '',
+        shiftStart: data.shiftStart || '',
+        shiftEnd: data.shiftEnd || ''
+      };
+      state.rows.push(row);
+      renderRows();
+      recalc();
+    }
+
+    function removeRow(id) {
+      state.rows = state.rows.filter(r => r.id !== id);
+      renderRows();
+      recalc();
+    }
+
+    function updateRow(id, key, value) {
+      const r = state.rows.find(x => x.id === id);
+      if (!r) return;
+      r[key] = value;
+      recalc();
+    }
+
+    function rowComputed(r, perHourValue) {
+      const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
+      const total = hours * perHourValue;
+      return { hours, total };
+    }
+
+    function recalc() {
+      const totalTips = parseNumber(el('totalTips').value);
+
+      let totalHours = 0;
+      for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
+
+      const perHourValue = (totalHours > 0) ? (totalTips / totalHours) : 0;
+
+      let distributed = 0;
+      for (const r of state.rows) distributed += rowComputed(r, perHourValue).total;
+
+      el('sumHours').textContent = fmt2(totalHours);
+      el('perHour').textContent = fmt2(perHourValue);
+      el('sumDistributed').textContent = fmt2(distributed);
+
+      const issues = [];
+      if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
+      if (totalTips <= 0) issues.push('סה״כ טיפים כולל הוא 0 או לא תקין. הזן מספר.');
+
+      for (let i=0;i<state.rows.length;i++){
+        const r = state.rows[i];
+        if (!r.date) issues.push(`שורת עובד ${i+1}: חסר תאריך.`);
+        if (r.shiftStart && timeToMinutes(r.shiftStart) == null) issues.push(`שורת עובד ${i+1}: "עליה למשמרת" בפורמט לא תקין (HH:MM).`);
+        if (r.shiftEnd && timeToMinutes(r.shiftEnd) == null) issues.push(`שורת עובד ${i+1}: "ירידה ממשמרת" בפורמט לא תקין (HH:MM).`);
+        if (r.arrival && timeToMinutes(r.arrival) == null) issues.push(`שורת עובד ${i+1}: "שעת הגעה" בפורמט לא תקין (HH:MM).`);
+      }
+
+      el('statusText').textContent =
+        issues.length === 0
+          ? 'מוכן. "כמה לשעה" מחושב אוטומטית לפי סה״כ טיפים / סה״כ שעות.'
+          : issues.join(' ');
+
+      const tbody = el('rows');
+      for (const tr of tbody.querySelectorAll('tr[data-id]')) {
+        const id = tr.getAttribute('data-id');
+        const r = state.rows.find(x => x.id === id);
+        if (!r) continue;
+        const { hours, total } = rowComputed(r, perHourValue);
+        tr.querySelector('[data-col="hours"]').textContent = fmt2(hours);
+        tr.querySelector('[data-col="perHour"]').textContent = fmt2(perHourValue);
+        tr.querySelector('[data-col="total"]').textContent = fmt2(total);
+      }
+    }
+
+    function renderRows() {
+      const tbody = el('rows');
+      tbody.innerHTML = '';
+
+      state.rows.forEach((r) => {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-id', r.id);
+
+        tr.innerHTML = `
+          <td><input type="date" value="${escapeHtml(r.date)}" /></td>
+          <td><input value="${escapeHtml(r.firstName)}" placeholder="שם פרטי" /></td>
+          <td><input value="${escapeHtml(r.lastName)}" placeholder="שם משפחה" /></td>
+          <td><input value="${escapeHtml(r.arrival)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input value="${escapeHtml(r.shiftStart)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td class="num" data-col="hours">0.00</td>
+          <td class="num" data-col="perHour">0.00</td>
+          <td class="num" data-col="total">0.00</td>
+          <td>
+            <div class="rowControls">
+              <button class="btn mini danger" type="button">מחק</button>
+            </div>
+          </td>
+        `;
+
+        const inputs = tr.querySelectorAll('input');
+        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd
+        inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
+        inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
+        inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
+        inputs[3].addEventListener('input', (e)=>updateRow(r.id,'arrival', e.target.value));
+        inputs[4].addEventListener('input', (e)=>updateRow(r.id,'shiftStart', e.target.value));
+        inputs[5].addEventListener('input', (e)=>updateRow(r.id,'shiftEnd', e.target.value));
+
+        tr.querySelector('button').addEventListener('click', ()=>removeRow(r.id));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(s){
+      return String(s ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#039;');
+    }
+
+    function exportToExcel() {
+      const totalTips = parseNumber(el('totalTips').value);
+
+      let totalHours = 0;
+      for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
+      const perHourValue = (totalHours > 0) ? (totalTips / totalHours) : 0;
+
+      const data = [];
+      data.push([
+        'Date',
+        'First Name',
+        'Last Name',
+        'Arrival',
+        'Shift Start',
+        'Shift End',
+        'Total Hours',
+        'Per Hour',
+        'Total Tips For Employee'
+      ]);
+
+      for (const r of state.rows) {
+        const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
+        const total = hours * perHourValue;
+        data.push([
+          r.date,
+          r.firstName,
+          r.lastName,
+          r.arrival,
+          r.shiftStart,
+          r.shiftEnd,
+          Number(hours.toFixed(2)),
+          Number(perHourValue.toFixed(2)),
+          Number(total.toFixed(2))
+        ]);
+      }
+
+      data.push([]);
+      data.push(['TOTAL TIPS', Number(totalTips.toFixed(2))]);
+      data.push(['TOTAL HOURS', Number(totalHours.toFixed(2))]);
+      data.push(['PER HOUR', Number(perHourValue.toFixed(2))]);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'TipSplit');
+
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      XLSX.writeFile(wb, `tips_${yyyy}-${mm}-${dd}.xlsx`);
+    }
+
+    function importFromExcel(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+        if (!rows || rows.length < 2) {
+          alert('הקובץ ריק או לא תקין.');
+          return;
+        }
+
+        const imported = [];
+        for (let i=1;i<rows.length;i++){
+          const r = rows[i];
+          if (!r || r.length === 0) break;
+          const firstCell = String(r[0] ?? '').trim();
+          if (!firstCell) break;
+          if (firstCell.toUpperCase() === 'TOTAL TIPS') break;
+
+          imported.push({
+            date: String(r[0] ?? ''),
+            firstName: String(r[1] ?? ''),
+            lastName: String(r[2] ?? ''),
+            arrival: String(r[3] ?? ''),
+            shiftStart: String(r[4] ?? ''),
+            shiftEnd: String(r[5] ?? '')
+          });
+        }
+
+        let totalTips = 0;
+        for (let i=0;i<rows.length;i++){
+          const r = rows[i];
+          if (!r || r.length < 2) continue;
+          const k = String(r[0] ?? '').trim().toUpperCase();
+          if (k === 'TOTAL TIPS') {
+            totalTips = parseNumber(r[1]);
+            break;
+          }
+        }
+
+        state.rows = [];
+        imported.forEach(x => addRow(x));
+        if (totalTips) el('totalTips').value = String(totalTips);
+
+        renderRows();
+        recalc();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Service Worker for PWA install
+    (function registerSW(){
+      if (!('serviceWorker' in navigator)) return;
+      window.addEventListener('load', async () => {
+        try { await navigator.serviceWorker.register('./sw.js', { scope: './' }); } catch (e) {}
+      });
+    })();
+
+// PWA Install button (Android/Chrome)
+(function installPromptButton(){
+  const btn = el('installBtn');
+  if (!btn) return;
+
+  // Hide if already installed or running as standalone
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isStandalone) { btn.style.display = 'none'; return; }
+
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.style.display = 'inline-flex';
+  });
+
+  btn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    btn.style.display = 'none';
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch (e) {}
+    deferredPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    btn.style.display = 'none';
+    deferredPrompt = null;
+  });
+})();
+
+    // Events
+    el('addRowBtn').addEventListener('click', () => addRow());
+    el('totalTips').addEventListener('input', recalc);
+
+    el('exportBtn').addEventListener('click', () => {
+      if (state.rows.length === 0) {
+        alert('אין עובדים לייצוא. הוסף לפחות עובד אחד.');
+        return;
+      }
+      exportToExcel();
+    });
+
+    el('importBtn').addEventListener('click', () => el('filePicker').click());
+    el('filePicker').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      importFromExcel(f);
+      e.target.value = '';
+    });
+
+    // Init
+    setToday();
+    addRow();
+  </script>
+</body>
+</html>
