@@ -667,32 +667,25 @@
     (function registerSW(){
       if (!('serviceWorker' in navigator)) return;
       window.addEventListener('load', async () => {
-        try { await navigator.serviceWorker.register('/tips3/sw.js', { scope: '/tips3/' }); } catch (e) {}
+        try { await navigator.serviceWorker.register('./sw.js', { scope: './' }); } catch (e) {}
       });
     })();
 
 // PWA Install button (Android/Chrome)
 (function installPromptButton(){
   const btn = el('installBtn');
-  const fallback = document.getElementById('installFallback');
   if (!btn) return;
 
-  const isStandalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone;
-
-  if (isStandalone) {
-    btn.style.display = 'none';
-    return;
-  }
+  // Hide if already installed or running as standalone
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (isStandalone) { btn.style.display = 'none'; return; }
 
   let deferredPrompt = null;
-  let installEventFired = false;
 
   window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
     e.preventDefault();
     deferredPrompt = e;
-    installEventFired = true;
     btn.style.display = 'inline-flex';
   });
 
@@ -706,16 +699,8 @@
 
   window.addEventListener('appinstalled', () => {
     btn.style.display = 'none';
-    if (fallback) fallback.style.display = 'none';
     deferredPrompt = null;
   });
-
-  // 🔥 fallback אם האירוע לא נורה תוך 5 שניות
-  setTimeout(() => {
-    if (!installEventFired && !isStandalone && fallback) {
-      fallback.style.display = 'block';
-    }
-  }, 5000);
 })();
 
     // Events
@@ -742,29 +727,5 @@
     setToday();
     addRow();
   </script>
-<div id="installFallback" style="
-  display:none;
-  position:fixed;
-  bottom:16px;
-  left:16px;
-  right:16px;
-  background:#0f1a2f;
-  color:#eaf0ff;
-  padding:14px;
-  border-radius:14px;
-  box-shadow:0 18px 50px rgba(0,0,0,.35);
-  border:1px solid rgba(255,255,255,.10);
-  z-index:9999;
-  font-size:14px;
-">
-  כדי להתקין את האפליקציה:<br>
-  לחץ ⋮ למעלה בדפדפן ואז <b>Install app</b> או <b>Add to Home screen</b>
-  <div style="margin-top:8px;text-align:left">
-    <button onclick="document.getElementById('installFallback').remove()"
-      style="background:#374151;color:white;border:none;padding:6px 10px;border-radius:8px">
-      סגור
-    </button>
-  </div>
-</div>
 </body>
 </html>
