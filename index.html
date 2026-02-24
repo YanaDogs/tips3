@@ -667,7 +667,7 @@
     (function registerSW(){
       if (!('serviceWorker' in navigator)) return;
       window.addEventListener('load', async () => {
-        try { await navigator.serviceWorker.register('./sw.js', { scope: './' }); } catch (e) {}
+        try { await navigator.serviceWorker.register('/tips3/sw.js', { scope: '/tips3/' }); } catch (e) {}
       });
     })();
 
