@@ -1,11 +1,11 @@
 const CACHE_NAME = "tipsplit-pro-v2";
 const ASSETS = [
-  "/tips3/",
-  "/tips3/index.html",
-  "/tips3/manifest.webmanifest",
-  "/tips3/sw.js",
-  "/tips3/icons/icon-192.png",
-  "/tips3/icons/icon-512.png"
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./sw.js",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
