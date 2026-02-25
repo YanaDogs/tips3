@@ -211,7 +211,7 @@
     table{
       width:100%;
       border-collapse:collapse;
-      min-width: 1180px;
+      min-width: 1280px;
     }
 
     thead th{
@@ -358,6 +358,7 @@
                 <th style="width:140px;">ירידה ממשמרת</th>
                 <th style="width:130px;">סה״כ שעות</th>
                 <th style="width:140px;">טיפים לשעה</th>
+                <th style="width:140px;">השלמה לשעה</th>
                 <th style="width:170px;">סכום טיפים לעובד</th>
                 <th style="width:190px;">סכום כולל עם השלמה</th>
                 <th style="width:120px;">פעולות</th>
@@ -407,20 +408,19 @@
       if (!Number.isFinite(x)) return '0.00';
       return x.toFixed(2);
     }
+
     function autoColonWhileTyping(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return digits.slice(0, digits.length - 2) + ':' + digits.slice(-2);
-}
+      const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 4);
+      if (digits.length <= 2) return digits;
+      return digits.slice(0, digits.length - 2) + ':' + digits.slice(-2);
+    }
 
     function normalizeOnBlurToHHMM(raw) {
       let s = String(raw ?? '').trim();
       if (!s) return '';
 
-      // if only digits -> convert to H:MM or HH:MM first
       if (/^\d+$/.test(s)) s = autoColonWhileTyping(s);
 
-      // accept also single-digit minutes/hours on blur and normalize to HH:MM
       const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
       if (!m) return '';
 
@@ -499,6 +499,7 @@
 
       const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
       const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
+      const completionPerHour = Math.max(0, minPerHour - tipsPerHour);
 
       const issues = [];
       if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
@@ -523,7 +524,7 @@
 
       el('statusText').textContent =
         issues.length === 0
-          ? 'מוכן. טיפים לשעה מחושב לפי סה״כ טיפים / סה״כ שעות. "לשעה עם השלמה" הוא המקסימום בין טיפים לשעה לבין השכר המובטח.'
+          ? 'מוכן. טיפים לשעה מחושב לפי סה״כ טיפים / סה״כ שעות. "לשעה עם השלמה" הוא המקסימום בין טיפים לשעה לבין השכר המובטח. "השלמה לשעה" היא הפער (אם קיים).'
           : issues.join(' ');
 
       const tbody = el('rows');
@@ -536,6 +537,7 @@
 
         tr.querySelector('[data-col="hours"]').textContent = fmt2(c.hours);
         tr.querySelector('[data-col="tipsPerHour"]').textContent = fmt2(tipsPerHour);
+        tr.querySelector('[data-col="completionPerHour"]').textContent = fmt2(completionPerHour);
         tr.querySelector('[data-col="totalTips"]').textContent = fmt2(c.totalTips);
         tr.querySelector('[data-col="totalWithCompletion"]').textContent = fmt2(c.totalWithCompletion);
       }
@@ -558,6 +560,7 @@
           <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td class="num" data-col="hours">0.00</td>
           <td class="num" data-col="tipsPerHour">0.00</td>
+          <td class="num" data-col="completionPerHour">0.00</td>
           <td class="num" data-col="totalTips">0.00</td>
           <td class="num" data-col="totalWithCompletion">0.00</td>
           <td>
@@ -572,7 +575,8 @@
         inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
         inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
         inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
-                // Arrival (auto ":" while typing + normalize on blur)
+
+        // Arrival (auto ":" while typing + normalize on blur)
         inputs[3].addEventListener('input', (e) => {
           const v = autoColonWhileTyping(e.target.value);
           if (e.target.value !== v) e.target.value = v;
@@ -631,6 +635,7 @@
 
       const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
       const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
+      const completionPerHour = Math.max(0, minPerHour - tipsPerHour);
 
       const data = [];
       data.push([
@@ -642,6 +647,7 @@
         'Shift End',
         'Total Hours',
         'Tips Per Hour',
+        'Completion Per Hour',
         'Total Tips For Employee',
         'Total With Completion'
       ]);
@@ -657,6 +663,7 @@
           r.shiftEnd,
           Number(c.hours.toFixed(2)),
           Number(tipsPerHour.toFixed(2)),
+          Number(completionPerHour.toFixed(2)),
           Number(c.totalTips.toFixed(2)),
           Number(c.totalWithCompletion.toFixed(2))
         ]);
@@ -666,6 +673,7 @@
       data.push(['TOTAL TIPS', Number(totalTips.toFixed(2))]);
       data.push(['TOTAL HOURS', Number(totalHours.toFixed(2))]);
       data.push(['TIPS PER HOUR', Number(tipsPerHour.toFixed(2))]);
+      data.push(['COMPLETION PER HOUR', Number(completionPerHour.toFixed(2))]);
       data.push(['MIN PER HOUR', Number(minPerHour.toFixed(2))]);
       data.push(['WITH COMPLETION PER HOUR', Number(withCompletionPerHour.toFixed(2))]);
 
