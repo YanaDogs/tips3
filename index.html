@@ -201,25 +201,6 @@
       font-size:12.5px;
     }
 
-    .summary{
-      display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap:10px;
-    }
-
-    .sumCard{
-      background: rgba(255,255,255,.04);
-      border:1px solid var(--line);
-      border-radius: 14px;
-      padding:12px;
-      min-height:74px;
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-    }
-    .sumCard span{ color: var(--muted); font-size:12.5px; }
-    .sumCard b{ font-size:16px; letter-spacing:.2px; }
-
     .tableWrap{
       overflow:auto;
       border-radius: 16px;
@@ -279,10 +260,28 @@
     .fileInput{ display:none; }
 
     @media (max-width: 780px){
-      .summary{ grid-template-columns: 1fr; }
       .cardHead{ align-items:flex-start; }
       .btnRow{ justify-content:stretch; }
       .btnRow .btn{ flex:1; justify-content:center; }
+    }
+    .inlineSummary{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 10px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-size:12.5px;
+      line-height:1;
+    }
+    .inlineSummary b{
+      color: var(--text);
+      font-weight:700;
+    }
+    .inlineSummary .dot{
+      opacity:.55;
     }
   </style>
 </head>
@@ -318,22 +317,12 @@
             <input id="totalTips" inputmode="decimal" placeholder="לדוגמה: 1250" />
           </div>
 
-          <div style="grid-column: span 12;">
-            <div class="summary">
-              <div class="sumCard">
-                <span>סה״כ שעות כלליות</span>
-                <b class="num" id="sumHours">0.00</b>
-              </div>
-              <div class="sumCard">
-                <span>כמה לשעה (מחושב)</span>
-                <b class="num" id="perHour">0.00</b>
-              </div>
-              <div class="sumCard">
-                <span>בקרת סה״כ חלוקה</span>
-                <b class="num" id="sumDistributed">0.00</b>
-              </div>
-            </div>
+          <div class="inlineSummary" style="grid-column: span 12;">
+            <span>סה״כ שעות: <b class="num" id="sumHours">0.00</b></span>
+            <span class="dot">•</span>
+            <span>לשעה: <b class="num" id="perHour">0.00</b></span>
           </div>
+        </div>
         </div>
 
         <div class="status" id="statusText"></div>
@@ -476,10 +465,6 @@
       let distributed = 0;
       for (const r of state.rows) distributed += rowComputed(r, perHourValue).total;
 
-      el('sumHours').textContent = fmt2(totalHours);
-      el('perHour').textContent = fmt2(perHourValue);
-      el('sumDistributed').textContent = fmt2(distributed);
-
       const issues = [];
       if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
       if (totalTips <= 0) issues.push('סה״כ טיפים כולל הוא 0 או לא תקין. הזן מספר.');
@@ -491,6 +476,11 @@
         if (r.shiftEnd && timeToMinutes(r.shiftEnd) == null) issues.push(`שורת עובד ${i+1}: "ירידה ממשמרת" בפורמט לא תקין (HH:MM).`);
         if (r.arrival && timeToMinutes(r.arrival) == null) issues.push(`שורת עובד ${i+1}: "שעת הגעה" בפורמט לא תקין (HH:MM).`);
       }
+
+      const sumHoursEl = el('sumHours');
+      const perHourEl = el('perHour');
+      if (sumHoursEl) sumHoursEl.textContent = fmt2(totalHours);
+      if (perHourEl) perHourEl.textContent = fmt2(perHourValue);
 
       el('statusText').textContent =
         issues.length === 0
@@ -671,37 +661,37 @@
       });
     })();
 
-// PWA Install button (Android/Chrome)
-(function installPromptButton(){
-  const btn = el('installBtn');
-  if (!btn) return;
+    // PWA Install button (Android/Chrome)
+    (function installPromptButton(){
+      const btn = el('installBtn');
+      if (!btn) return;
 
-  // Hide if already installed or running as standalone
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  if (isStandalone) { btn.style.display = 'none'; return; }
+      // Hide if already installed or running as standalone
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      if (isStandalone) { btn.style.display = 'none'; return; }
 
-  let deferredPrompt = null;
+      let deferredPrompt = null;
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
-    deferredPrompt = e;
-    btn.style.display = 'inline-flex';
-  });
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        deferredPrompt = e;
+        btn.style.display = 'inline-flex';
+      });
 
-  btn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    btn.style.display = 'none';
-    deferredPrompt.prompt();
-    try { await deferredPrompt.userChoice; } catch (e) {}
-    deferredPrompt = null;
-  });
+      btn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        btn.style.display = 'none';
+        deferredPrompt.prompt();
+        try { await deferredPrompt.userChoice; } catch (e) {}
+        deferredPrompt = null;
+      });
 
-  window.addEventListener('appinstalled', () => {
-    btn.style.display = 'none';
-    deferredPrompt = null;
-  });
-})();
+      window.addEventListener('appinstalled', () => {
+        btn.style.display = 'none';
+        deferredPrompt = null;
+      });
+    })();
 
     // Events
     el('addRowBtn').addEventListener('click', () => addRow());
