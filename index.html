@@ -211,7 +211,7 @@
     table{
       width:100%;
       border-collapse:collapse;
-      min-width: 1040px;
+      min-width: 1180px;
     }
 
     thead th{
@@ -264,6 +264,7 @@
       .btnRow{ justify-content:stretch; }
       .btnRow .btn{ flex:1; justify-content:center; }
     }
+
     .inlineSummary{
       display:flex;
       align-items:center;
@@ -275,6 +276,7 @@
       color: var(--muted);
       font-size:12.5px;
       line-height:1;
+      flex-wrap:wrap;
     }
     .inlineSummary b{
       color: var(--text);
@@ -299,7 +301,7 @@
       <div class="cardHead">
         <div class="title">
           <b>הגדרות כלליות</b>
-          <span>הזן סה״כ טיפים, הוסף עובדים, והמערכת תחשב אוטומטית.</span>
+          <span>הזן סה״כ טיפים, הזן שכר מובטח לשעה (אופציונלי), הוסף עובדים, והמערכת תחשב אוטומטית.</span>
         </div>
         <div class="btnRow">
           <button class="btn primary" id="installBtn" style="display:none;">⬇️ התקן אפליקציה</button>
@@ -317,12 +319,18 @@
             <input id="totalTips" inputmode="decimal" placeholder="לדוגמה: 1250" />
           </div>
 
+          <div class="field" style="grid-column: span 12;">
+            <label>שכר מובטח לשעה (כולל השלמה) - אופציונלי</label>
+            <input id="minPerHour" inputmode="decimal" placeholder="לדוגמה: 100" />
+          </div>
+
           <div class="inlineSummary" style="grid-column: span 12;">
             <span>סה״כ שעות: <b class="num" id="sumHours">0.00</b></span>
             <span class="dot">•</span>
-            <span>לשעה: <b class="num" id="perHour">0.00</b></span>
+            <span>טיפים לשעה: <b class="num" id="tipsPerHour">0.00</b></span>
+            <span class="dot">•</span>
+            <span>לשעה עם השלמה: <b class="num" id="withCompletionPerHour">0.00</b></span>
           </div>
-        </div>
         </div>
 
         <div class="status" id="statusText"></div>
@@ -333,7 +341,7 @@
       <div class="cardHead">
         <div class="title">
           <b>עובדים</b>
-          <span>המערכת מחשבת לכל עובד: שעות × "כמה לשעה" המחושב הכללי.</span>
+          <span>המערכת מחשבת לכל עובד: שעות × טיפים לשעה, ובנוסף שעות × (טיפים לשעה או מובטח לשעה - הגבוה מביניהם).</span>
         </div>
       </div>
 
@@ -349,8 +357,9 @@
                 <th style="width:140px;">עליה למשמרת</th>
                 <th style="width:140px;">ירידה ממשמרת</th>
                 <th style="width:130px;">סה״כ שעות</th>
-                <th style="width:140px;">כמה לשעה</th>
-                <th style="width:170px;">סכום כולל לעובד</th>
+                <th style="width:140px;">טיפים לשעה</th>
+                <th style="width:170px;">סכום טיפים לעובד</th>
+                <th style="width:190px;">סכום כולל עם השלמה</th>
                 <th style="width:120px;">פעולות</th>
               </tr>
             </thead>
@@ -363,7 +372,6 @@
         </div>
       </div>
     </div>
-
   </div>
 
   <script>
@@ -398,6 +406,30 @@
       const x = Number(n);
       if (!Number.isFinite(x)) return '0.00';
       return x.toFixed(2);
+    }
+    function autoColonWhileTyping(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, digits.length - 2) + ':' + digits.slice(-2);
+}
+
+    function normalizeOnBlurToHHMM(raw) {
+      let s = String(raw ?? '').trim();
+      if (!s) return '';
+
+      // if only digits -> convert to H:MM or HH:MM first
+      if (/^\d+$/.test(s)) s = autoColonWhileTyping(s);
+
+      // accept also single-digit minutes/hours on blur and normalize to HH:MM
+      const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
+      if (!m) return '';
+
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isInteger(hh) || !Number.isInteger(mm)) return '';
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+
+      return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
     }
 
     function timeToMinutes(t) {
@@ -448,26 +480,30 @@
       recalc();
     }
 
-    function rowComputed(r, perHourValue) {
+    function rowComputed(r, tipsPerHour, minPerHour) {
       const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
-      const total = hours * perHourValue;
-      return { hours, total };
+      const perHourWithCompletion = Math.max(tipsPerHour, minPerHour);
+
+      const totalTips = hours * tipsPerHour;
+      const totalWithCompletion = hours * perHourWithCompletion;
+
+      return { hours, totalTips, totalWithCompletion, perHourWithCompletion };
     }
 
     function recalc() {
       const totalTips = parseNumber(el('totalTips').value);
+      const minPerHour = parseNumber(el('minPerHour').value);
 
       let totalHours = 0;
       for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
 
-      const perHourValue = (totalHours > 0) ? (totalTips / totalHours) : 0;
-
-      let distributed = 0;
-      for (const r of state.rows) distributed += rowComputed(r, perHourValue).total;
+      const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
+      const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
 
       const issues = [];
       if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
       if (totalTips <= 0) issues.push('סה״כ טיפים כולל הוא 0 או לא תקין. הזן מספר.');
+      if (minPerHour < 0) issues.push('שכר מובטח לשעה לא יכול להיות שלילי.');
 
       for (let i=0;i<state.rows.length;i++){
         const r = state.rows[i];
@@ -478,13 +514,16 @@
       }
 
       const sumHoursEl = el('sumHours');
-      const perHourEl = el('perHour');
+      const tipsPerHourEl = el('tipsPerHour');
+      const withCompletionEl = el('withCompletionPerHour');
+
       if (sumHoursEl) sumHoursEl.textContent = fmt2(totalHours);
-      if (perHourEl) perHourEl.textContent = fmt2(perHourValue);
+      if (tipsPerHourEl) tipsPerHourEl.textContent = fmt2(tipsPerHour);
+      if (withCompletionEl) withCompletionEl.textContent = fmt2(withCompletionPerHour);
 
       el('statusText').textContent =
         issues.length === 0
-          ? 'מוכן. "כמה לשעה" מחושב אוטומטית לפי סה״כ טיפים / סה״כ שעות.'
+          ? 'מוכן. טיפים לשעה מחושב לפי סה״כ טיפים / סה״כ שעות. "לשעה עם השלמה" הוא המקסימום בין טיפים לשעה לבין השכר המובטח.'
           : issues.join(' ');
 
       const tbody = el('rows');
@@ -492,10 +531,13 @@
         const id = tr.getAttribute('data-id');
         const r = state.rows.find(x => x.id === id);
         if (!r) continue;
-        const { hours, total } = rowComputed(r, perHourValue);
-        tr.querySelector('[data-col="hours"]').textContent = fmt2(hours);
-        tr.querySelector('[data-col="perHour"]').textContent = fmt2(perHourValue);
-        tr.querySelector('[data-col="total"]').textContent = fmt2(total);
+
+        const c = rowComputed(r, tipsPerHour, minPerHour);
+
+        tr.querySelector('[data-col="hours"]').textContent = fmt2(c.hours);
+        tr.querySelector('[data-col="tipsPerHour"]').textContent = fmt2(tipsPerHour);
+        tr.querySelector('[data-col="totalTips"]').textContent = fmt2(c.totalTips);
+        tr.querySelector('[data-col="totalWithCompletion"]').textContent = fmt2(c.totalWithCompletion);
       }
     }
 
@@ -515,8 +557,9 @@
           <td><input value="${escapeHtml(r.shiftStart)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td class="num" data-col="hours">0.00</td>
-          <td class="num" data-col="perHour">0.00</td>
-          <td class="num" data-col="total">0.00</td>
+          <td class="num" data-col="tipsPerHour">0.00</td>
+          <td class="num" data-col="totalTips">0.00</td>
+          <td class="num" data-col="totalWithCompletion">0.00</td>
           <td>
             <div class="rowControls">
               <button class="btn mini danger" type="button">מחק</button>
@@ -529,9 +572,41 @@
         inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
         inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
         inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
-        inputs[3].addEventListener('input', (e)=>updateRow(r.id,'arrival', e.target.value));
-        inputs[4].addEventListener('input', (e)=>updateRow(r.id,'shiftStart', e.target.value));
-        inputs[5].addEventListener('input', (e)=>updateRow(r.id,'shiftEnd', e.target.value));
+                // Arrival (auto ":" while typing + normalize on blur)
+        inputs[3].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'arrival', e.target.value);
+        });
+        inputs[3].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'arrival', e.target.value);
+        });
+
+        // Shift Start
+        inputs[4].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'shiftStart', e.target.value);
+        });
+        inputs[4].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'shiftStart', e.target.value);
+        });
+
+        // Shift End
+        inputs[5].addEventListener('input', (e) => {
+          const v = autoColonWhileTyping(e.target.value);
+          if (e.target.value !== v) e.target.value = v;
+          updateRow(r.id, 'shiftEnd', e.target.value);
+        });
+        inputs[5].addEventListener('blur', (e) => {
+          const v = normalizeOnBlurToHHMM(e.target.value);
+          if (v) e.target.value = v;
+          updateRow(r.id, 'shiftEnd', e.target.value);
+        });
 
         tr.querySelector('button').addEventListener('click', ()=>removeRow(r.id));
         tbody.appendChild(tr);
@@ -549,10 +624,13 @@
 
     function exportToExcel() {
       const totalTips = parseNumber(el('totalTips').value);
+      const minPerHour = parseNumber(el('minPerHour').value);
 
       let totalHours = 0;
       for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
-      const perHourValue = (totalHours > 0) ? (totalTips / totalHours) : 0;
+
+      const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
+      const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
 
       const data = [];
       data.push([
@@ -563,13 +641,13 @@
         'Shift Start',
         'Shift End',
         'Total Hours',
-        'Per Hour',
-        'Total Tips For Employee'
+        'Tips Per Hour',
+        'Total Tips For Employee',
+        'Total With Completion'
       ]);
 
       for (const r of state.rows) {
-        const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
-        const total = hours * perHourValue;
+        const c = rowComputed(r, tipsPerHour, minPerHour);
         data.push([
           r.date,
           r.firstName,
@@ -577,16 +655,19 @@
           r.arrival,
           r.shiftStart,
           r.shiftEnd,
-          Number(hours.toFixed(2)),
-          Number(perHourValue.toFixed(2)),
-          Number(total.toFixed(2))
+          Number(c.hours.toFixed(2)),
+          Number(tipsPerHour.toFixed(2)),
+          Number(c.totalTips.toFixed(2)),
+          Number(c.totalWithCompletion.toFixed(2))
         ]);
       }
 
       data.push([]);
       data.push(['TOTAL TIPS', Number(totalTips.toFixed(2))]);
       data.push(['TOTAL HOURS', Number(totalHours.toFixed(2))]);
-      data.push(['PER HOUR', Number(perHourValue.toFixed(2))]);
+      data.push(['TIPS PER HOUR', Number(tipsPerHour.toFixed(2))]);
+      data.push(['MIN PER HOUR', Number(minPerHour.toFixed(2))]);
+      data.push(['WITH COMPLETION PER HOUR', Number(withCompletionPerHour.toFixed(2))]);
 
       const ws = XLSX.utils.aoa_to_sheet(data);
       const wb = XLSX.utils.book_new();
@@ -633,19 +714,21 @@
         }
 
         let totalTips = 0;
+        let minPerHour = 0;
+
         for (let i=0;i<rows.length;i++){
           const r = rows[i];
           if (!r || r.length < 2) continue;
           const k = String(r[0] ?? '').trim().toUpperCase();
-          if (k === 'TOTAL TIPS') {
-            totalTips = parseNumber(r[1]);
-            break;
-          }
+          if (k === 'TOTAL TIPS') totalTips = parseNumber(r[1]);
+          if (k === 'MIN PER HOUR') minPerHour = parseNumber(r[1]);
         }
 
         state.rows = [];
         imported.forEach(x => addRow(x));
+
         if (totalTips) el('totalTips').value = String(totalTips);
+        if (minPerHour) el('minPerHour').value = String(minPerHour);
 
         renderRows();
         recalc();
@@ -666,14 +749,12 @@
       const btn = el('installBtn');
       if (!btn) return;
 
-      // Hide if already installed or running as standalone
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
       if (isStandalone) { btn.style.display = 'none'; return; }
 
       let deferredPrompt = null;
 
       window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent the mini-infobar from appearing on mobile
         e.preventDefault();
         deferredPrompt = e;
         btn.style.display = 'inline-flex';
@@ -696,6 +777,7 @@
     // Events
     el('addRowBtn').addEventListener('click', () => addRow());
     el('totalTips').addEventListener('input', recalc);
+    el('minPerHour').addEventListener('input', recalc);
 
     el('exportBtn').addEventListener('click', () => {
       if (state.rows.length === 0) {
