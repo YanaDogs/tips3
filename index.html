@@ -146,6 +146,12 @@
       box-shadow: 0 0 0 3px rgba(124,92,255,.18);
     }
 
+    /* Arrival turns red if gap > 60 minutes */
+    .arrivalLate{
+      border-color: rgba(239,68,68,.85) !important;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.18) !important;
+    }
+
     .btnRow{
       display:flex;
       gap:10px;
@@ -452,6 +458,16 @@
       return diff / 60;
     }
 
+    // Minutes forward from "from" to "to" (supports crossing midnight)
+    function forwardMinutesDiff(fromHHMM, toHHMM) {
+      const a = timeToMinutes(fromHHMM);
+      const b = timeToMinutes(toHHMM);
+      if (a == null || b == null) return null;
+      let diff = b - a;
+      if (diff < 0) diff += 24*60;
+      return diff;
+    }
+
     function addRow(data = {}) {
       const row = {
         id: crypto.randomUUID(),
@@ -540,6 +556,14 @@
         tr.querySelector('[data-col="completionPerHour"]').textContent = fmt2(completionPerHour);
         tr.querySelector('[data-col="totalTips"]').textContent = fmt2(c.totalTips);
         tr.querySelector('[data-col="totalWithCompletion"]').textContent = fmt2(c.totalWithCompletion);
+
+        // Arrival red if gap (Arrival -> Shift Start) > 60 minutes
+        const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
+        const arrivalInput = tr.querySelector('input[data-role="arrival"]');
+        if (arrivalInput) {
+          const late = (gap != null && gap > 60);
+          arrivalInput.classList.toggle('arrivalLate', late);
+        }
       }
     }
 
@@ -555,7 +579,7 @@
           <td><input type="date" value="${escapeHtml(r.date)}" /></td>
           <td><input value="${escapeHtml(r.firstName)}" placeholder="שם פרטי" /></td>
           <td><input value="${escapeHtml(r.lastName)}" placeholder="שם משפחה" /></td>
-          <td><input value="${escapeHtml(r.arrival)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input data-role="arrival" value="${escapeHtml(r.arrival)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td><input value="${escapeHtml(r.shiftStart)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td class="num" data-col="hours">0.00</td>
@@ -678,6 +702,28 @@
       data.push(['WITH COMPLETION PER HOUR', Number(withCompletionPerHour.toFixed(2))]);
 
       const ws = XLSX.utils.aoa_to_sheet(data);
+
+      // Color "Arrival" cell red when gap > 60 minutes (Excel)
+      // Arrival column index in export: 3 (0-based), and data rows start at row 2 in Excel (1-based)
+      for (let i = 0; i < state.rows.length; i++) {
+        const r = state.rows[i];
+        const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
+        if (gap != null && gap > 60) {
+          const excelRow = 2 + i; // header is row 1
+          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 }); // r is 0-based
+          if (!ws[cellAddress]) continue;
+
+          ws[cellAddress].s = ws[cellAddress].s || {};
+          ws[cellAddress].s.fill = {
+            patternType: "solid",
+            fgColor: { rgb: "FFEF4444" }
+          };
+          ws[cellAddress].s.font = ws[cellAddress].s.font || {};
+          ws[cellAddress].s.font.color = { rgb: "FFFFFFFF" };
+        }
+      }
+
+      // Important: enable styles in writeFile
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'TipSplit');
 
@@ -685,7 +731,8 @@
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth()+1).padStart(2,'0');
       const dd = String(d.getDate()).padStart(2,'0');
-      XLSX.writeFile(wb, `tips_${yyyy}-${mm}-${dd}.xlsx`);
+
+      XLSX.writeFile(wb, `tips_${yyyy}-${mm}-${dd}.xlsx`, { bookType: "xlsx", cellStyles: true });
     }
 
     function importFromExcel(file) {
