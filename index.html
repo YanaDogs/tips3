@@ -152,6 +152,12 @@
       box-shadow: 0 0 0 3px rgba(239,68,68,.18) !important;
     }
 
+    /* Manual completion input highlight */
+    .completionManual{
+      border-color: rgba(124,92,255,.75) !important;
+      box-shadow: 0 0 0 3px rgba(124,92,255,.18) !important;
+    }
+
     .btnRow{
       display:flex;
       gap:10px;
@@ -291,6 +297,12 @@
     .inlineSummary .dot{
       opacity:.55;
     }
+
+    .cellInput{
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 12px;
+    }
   </style>
 </head>
 <body>
@@ -347,7 +359,7 @@
       <div class="cardHead">
         <div class="title">
           <b>עובדים</b>
-          <span>המערכת מחשבת לכל עובד: שעות × טיפים לשעה, ובנוסף שעות × (טיפים לשעה או מובטח לשעה - הגבוה מביניהם).</span>
+          <span>עמודת "השלמה לשעה" מציגה את ההשלמה הכללית. אם תערוך תא של עובד מסוים, הערך שלו יישמר לעובד הזה בלבד. מחיקת הערך תחזיר אותו לחישוב הכללי.</span>
         </div>
       </div>
 
@@ -364,7 +376,7 @@
                 <th style="width:140px;">ירידה ממשמרת</th>
                 <th style="width:130px;">סה״כ שעות</th>
                 <th style="width:140px;">טיפים לשעה</th>
-                <th style="width:140px;">השלמה לשעה</th>
+                <th style="width:160px;">השלמה לשעה</th>
                 <th style="width:170px;">סכום טיפים לעובד</th>
                 <th style="width:190px;">סכום כולל עם השלמה</th>
                 <th style="width:120px;">פעולות</th>
@@ -407,6 +419,14 @@
       if (!s) return 0;
       const n = Number(s);
       return Number.isFinite(n) ? n : 0;
+    }
+
+    function parseNumberOrNull(v) {
+      if (v == null) return null;
+      const s = String(v).trim().replace(/,/g,'');
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
     }
 
     function fmt2(n) {
@@ -476,7 +496,12 @@
         lastName: data.lastName || '',
         arrival: data.arrival || '',
         shiftStart: data.shiftStart || '',
-        shiftEnd: data.shiftEnd || ''
+        shiftEnd: data.shiftEnd || '',
+
+        // Completion override per employee:
+        // If completionOverride is null => AUTO (use global completionPerHour)
+        // If completionOverride is a number => MANUAL (use this number)
+        completionOverride: (data.completionOverride ?? null)
       };
       state.rows.push(row);
       renderRows();
@@ -496,14 +521,20 @@
       recalc();
     }
 
-    function rowComputed(r, tipsPerHour, minPerHour) {
+    function getRowCompletionPerHour(r, globalCompletionPerHour) {
+      return (r.completionOverride == null) ? globalCompletionPerHour : Math.max(0, r.completionOverride);
+    }
+
+    function rowComputed(r, tipsPerHour, globalCompletionPerHour) {
       const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
-      const perHourWithCompletion = Math.max(tipsPerHour, minPerHour);
+
+      const completionPerHour = getRowCompletionPerHour(r, globalCompletionPerHour);
+      const perHourWithCompletion = tipsPerHour + completionPerHour;
 
       const totalTips = hours * tipsPerHour;
       const totalWithCompletion = hours * perHourWithCompletion;
 
-      return { hours, totalTips, totalWithCompletion, perHourWithCompletion };
+      return { hours, totalTips, totalWithCompletion, completionPerHour, perHourWithCompletion };
     }
 
     function recalc() {
@@ -515,7 +546,7 @@
 
       const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
       const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
-      const completionPerHour = Math.max(0, minPerHour - tipsPerHour);
+      const globalCompletionPerHour = Math.max(0, minPerHour - tipsPerHour);
 
       const issues = [];
       if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
@@ -528,19 +559,16 @@
         if (r.shiftStart && timeToMinutes(r.shiftStart) == null) issues.push(`שורת עובד ${i+1}: "עליה למשמרת" בפורמט לא תקין (HH:MM).`);
         if (r.shiftEnd && timeToMinutes(r.shiftEnd) == null) issues.push(`שורת עובד ${i+1}: "ירידה ממשמרת" בפורמט לא תקין (HH:MM).`);
         if (r.arrival && timeToMinutes(r.arrival) == null) issues.push(`שורת עובד ${i+1}: "שעת הגעה" בפורמט לא תקין (HH:MM).`);
+        if (r.completionOverride != null && (!Number.isFinite(r.completionOverride) || r.completionOverride < 0)) issues.push(`שורת עובד ${i+1}: "השלמה לשעה" ידנית לא תקינה (חייב להיות מספר >= 0).`);
       }
 
-      const sumHoursEl = el('sumHours');
-      const tipsPerHourEl = el('tipsPerHour');
-      const withCompletionEl = el('withCompletionPerHour');
-
-      if (sumHoursEl) sumHoursEl.textContent = fmt2(totalHours);
-      if (tipsPerHourEl) tipsPerHourEl.textContent = fmt2(tipsPerHour);
-      if (withCompletionEl) withCompletionEl.textContent = fmt2(withCompletionPerHour);
+      if (el('sumHours')) el('sumHours').textContent = fmt2(totalHours);
+      if (el('tipsPerHour')) el('tipsPerHour').textContent = fmt2(tipsPerHour);
+      if (el('withCompletionPerHour')) el('withCompletionPerHour').textContent = fmt2(withCompletionPerHour);
 
       el('statusText').textContent =
         issues.length === 0
-          ? 'מוכן. טיפים לשעה מחושב לפי סה״כ טיפים / סה״כ שעות. "לשעה עם השלמה" הוא המקסימום בין טיפים לשעה לבין השכר המובטח. "השלמה לשעה" היא הפער (אם קיים).'
+          ? 'מוכן. "השלמה לשעה" היא AUTO לפי השכר המובטח, אלא אם הזנת ערך ידני לעובד ספציפי (MANUAL). מחיקת הערך מחזירה ל-AUTO.'
           : issues.join(' ');
 
       const tbody = el('rows');
@@ -549,13 +577,27 @@
         const r = state.rows.find(x => x.id === id);
         if (!r) continue;
 
-        const c = rowComputed(r, tipsPerHour, minPerHour);
+        const c = rowComputed(r, tipsPerHour, globalCompletionPerHour);
 
         tr.querySelector('[data-col="hours"]').textContent = fmt2(c.hours);
         tr.querySelector('[data-col="tipsPerHour"]').textContent = fmt2(tipsPerHour);
-        tr.querySelector('[data-col="completionPerHour"]').textContent = fmt2(completionPerHour);
         tr.querySelector('[data-col="totalTips"]').textContent = fmt2(c.totalTips);
         tr.querySelector('[data-col="totalWithCompletion"]').textContent = fmt2(c.totalWithCompletion);
+
+        // Completion input: AUTO shows global and stays synced; MANUAL keeps its value
+        const completionInput = tr.querySelector('input[data-role="completion"]');
+        if (completionInput) {
+            const isManual = (r.completionOverride != null);
+
+            // Always show a number:
+            completionInput.value = fmt2(isManual ? Math.max(0, r.completionOverride) : globalCompletionPerHour);
+
+            // Optional: keep a subtle highlight if it's manual (you can remove these 2 lines if you don't want any visual hint)
+            completionInput.classList.toggle('completionManual', isManual);
+
+            // No AUTO/MANUAL text
+            completionInput.placeholder = 'השלמה לשעה';
+            }
 
         // Arrival red if gap (Arrival -> Shift Start) > 60 minutes
         const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
@@ -584,7 +626,9 @@
           <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td class="num" data-col="hours">0.00</td>
           <td class="num" data-col="tipsPerHour">0.00</td>
-          <td class="num" data-col="completionPerHour">0.00</td>
+          <td>
+            <input class="cellInput" data-role="completion" inputmode="numeric" placeholder="השלמה לשעה" />
+          </td>
           <td class="num" data-col="totalTips">0.00</td>
           <td class="num" data-col="totalWithCompletion">0.00</td>
           <td>
@@ -595,7 +639,7 @@
         `;
 
         const inputs = tr.querySelectorAll('input');
-        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd
+        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd,6=completion
         inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
         inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
         inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
@@ -636,6 +680,33 @@
           updateRow(r.id, 'shiftEnd', e.target.value);
         });
 
+        // Completion override (AUTO/MANUAL)
+        // If user clears => AUTO (null). If user types a number => MANUAL (that number)
+        inputs[6].addEventListener('input', (e) => {
+          const raw = String(e.target.value ?? '');
+          const maybe = parseNumberOrNull(raw);
+          if (raw.trim() === '') {
+            updateRow(r.id, 'completionOverride', null); // AUTO
+            return;
+          }
+          if (maybe == null) return; // ignore invalid while typing
+          updateRow(r.id, 'completionOverride', Math.max(0, maybe)); // MANUAL
+        });
+        inputs[6].addEventListener('blur', (e) => {
+          const raw = String(e.target.value ?? '').trim();
+          if (raw === '') {
+            updateRow(r.id, 'completionOverride', null); // AUTO
+            return;
+          }
+          const maybe = parseNumberOrNull(raw);
+          if (maybe == null) {
+            // revert to current state display on recalc
+            recalc();
+            return;
+          }
+          updateRow(r.id, 'completionOverride', Math.max(0, maybe)); // MANUAL
+        });
+
         tr.querySelector('button').addEventListener('click', ()=>removeRow(r.id));
         tbody.appendChild(tr);
       });
@@ -659,7 +730,7 @@
 
       const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
       const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
-      const completionPerHour = Math.max(0, minPerHour - tipsPerHour);
+      const globalCompletionPerHour = Math.max(0, minPerHour - tipsPerHour);
 
       const data = [];
       data.push([
@@ -677,7 +748,7 @@
       ]);
 
       for (const r of state.rows) {
-        const c = rowComputed(r, tipsPerHour, minPerHour);
+        const c = rowComputed(r, tipsPerHour, globalCompletionPerHour);
         data.push([
           r.date,
           r.firstName,
@@ -687,7 +758,7 @@
           r.shiftEnd,
           Number(c.hours.toFixed(2)),
           Number(tipsPerHour.toFixed(2)),
-          Number(completionPerHour.toFixed(2)),
+          Number(c.completionPerHour.toFixed(2)), // per-row (AUTO or MANUAL)
           Number(c.totalTips.toFixed(2)),
           Number(c.totalWithCompletion.toFixed(2))
         ]);
@@ -697,33 +768,42 @@
       data.push(['TOTAL TIPS', Number(totalTips.toFixed(2))]);
       data.push(['TOTAL HOURS', Number(totalHours.toFixed(2))]);
       data.push(['TIPS PER HOUR', Number(tipsPerHour.toFixed(2))]);
-      data.push(['COMPLETION PER HOUR', Number(completionPerHour.toFixed(2))]);
+      data.push(['GLOBAL COMPLETION PER HOUR (AUTO)', Number(globalCompletionPerHour.toFixed(2))]);
       data.push(['MIN PER HOUR', Number(minPerHour.toFixed(2))]);
       data.push(['WITH COMPLETION PER HOUR', Number(withCompletionPerHour.toFixed(2))]);
 
       const ws = XLSX.utils.aoa_to_sheet(data);
 
       // Color "Arrival" cell red when gap > 60 minutes (Excel)
-      // Arrival column index in export: 3 (0-based), and data rows start at row 2 in Excel (1-based)
       for (let i = 0; i < state.rows.length; i++) {
         const r = state.rows[i];
         const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
         if (gap != null && gap > 60) {
-          const excelRow = 2 + i; // header is row 1
-          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 }); // r is 0-based
+          const excelRow = 2 + i; // header row 1
+          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 }); // Arrival col=3
           if (!ws[cellAddress]) continue;
 
           ws[cellAddress].s = ws[cellAddress].s || {};
-          ws[cellAddress].s.fill = {
-            patternType: "solid",
-            fgColor: { rgb: "FFEF4444" }
-          };
+          ws[cellAddress].s.fill = { patternType: "solid", fgColor: { rgb: "FFEF4444" } };
           ws[cellAddress].s.font = ws[cellAddress].s.font || {};
           ws[cellAddress].s.font.color = { rgb: "FFFFFFFF" };
         }
       }
 
-      // Important: enable styles in writeFile
+      // Highlight MANUAL completion cells (Completion col = 8) in Excel
+      for (let i = 0; i < state.rows.length; i++) {
+        const r = state.rows[i];
+        if (r.completionOverride == null) continue; // AUTO => no highlight
+        const excelRow = 2 + i;
+        const cellAddress = XLSX.utils.encode_cell({ c: 8, r: excelRow - 1 }); // Completion col=8
+        if (!ws[cellAddress]) continue;
+
+        ws[cellAddress].s = ws[cellAddress].s || {};
+        ws[cellAddress].s.fill = { patternType: "solid", fgColor: { rgb: "FF7C5CFF" } };
+        ws[cellAddress].s.font = ws[cellAddress].s.font || {};
+        ws[cellAddress].s.font.color = { rgb: "FFFFFFFF" };
+      }
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'TipSplit');
 
@@ -758,13 +838,18 @@
           if (!firstCell) break;
           if (firstCell.toUpperCase() === 'TOTAL TIPS') break;
 
+          // Supports older files: Completion might not exist
+          const completionCell = (r.length > 8) ? r[8] : null;
+          const completionOverride = parseNumberOrNull(completionCell);
+
           imported.push({
             date: String(r[0] ?? ''),
             firstName: String(r[1] ?? ''),
             lastName: String(r[2] ?? ''),
             arrival: String(r[3] ?? ''),
             shiftStart: String(r[4] ?? ''),
-            shiftEnd: String(r[5] ?? '')
+            shiftEnd: String(r[5] ?? ''),
+            completionOverride: (completionOverride == null ? null : Math.max(0, completionOverride))
           });
         }
 
