@@ -501,7 +501,7 @@
         // Completion override per employee:
         // If completionOverride is null => AUTO (use global completionPerHour)
         // If completionOverride is a number => MANUAL (use this number)
-        completionOverride: (data.completionOverride ?? null)
+        minPerHourOverride: (data.minPerHourOverride ?? null) // null => use global minPerHour
       };
       state.rows.push(row);
       renderRows();
@@ -521,21 +521,22 @@
       recalc();
     }
 
-    function getRowCompletionPerHour(r, globalCompletionPerHour) {
-      return (r.completionOverride == null) ? globalCompletionPerHour : Math.max(0, r.completionOverride);
-    }
+    function getRowMinPerHour(r, globalMinPerHour) {
+        return (r.minPerHourOverride == null) ? globalMinPerHour : Math.max(0, r.minPerHourOverride);
+        }
 
-    function rowComputed(r, tipsPerHour, globalCompletionPerHour) {
-      const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
+        function rowComputed(r, tipsPerHour, globalMinPerHour) {
+        const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
 
-      const completionPerHour = getRowCompletionPerHour(r, globalCompletionPerHour);
-      const perHourWithCompletion = tipsPerHour + completionPerHour;
+        const rowMinPerHour = getRowMinPerHour(r, globalMinPerHour);
+        const perHourWithCompletion = Math.max(tipsPerHour, rowMinPerHour);
+        const completionPerHour = Math.max(0, rowMinPerHour - tipsPerHour);
 
-      const totalTips = hours * tipsPerHour;
-      const totalWithCompletion = hours * perHourWithCompletion;
+        const totalTips = hours * tipsPerHour;
+        const totalWithCompletion = hours * perHourWithCompletion;
 
-      return { hours, totalTips, totalWithCompletion, completionPerHour, perHourWithCompletion };
-    }
+        return { hours, totalTips, totalWithCompletion, completionPerHour, perHourWithCompletion, rowMinPerHour };
+        }
 
     function recalc() {
       const totalTips = parseNumber(el('totalTips').value);
@@ -577,7 +578,7 @@
         const r = state.rows.find(x => x.id === id);
         if (!r) continue;
 
-        const c = rowComputed(r, tipsPerHour, globalCompletionPerHour);
+        const c = rowComputed(r, tipsPerHour, minPerHour);
 
         tr.querySelector('[data-col="hours"]').textContent = fmt2(c.hours);
         tr.querySelector('[data-col="tipsPerHour"]').textContent = fmt2(tipsPerHour);
@@ -587,17 +588,16 @@
         // Completion input: AUTO shows global and stays synced; MANUAL keeps its value
         const completionInput = tr.querySelector('input[data-role="completion"]');
         if (completionInput) {
-            const isManual = (r.completionOverride != null);
+        const isManual = (r.minPerHourOverride != null);
 
-            // Always show a number:
-            completionInput.value = fmt2(isManual ? Math.max(0, r.completionOverride) : globalCompletionPerHour);
+        // מציג את המובטח לשעה (גלובלי או אישי) – בדיוק “כפי שהוזן”
+        completionInput.value = fmt2(isManual ? Math.max(0, r.minPerHourOverride) : minPerHour);
 
-            // Optional: keep a subtle highlight if it's manual (you can remove these 2 lines if you don't want any visual hint)
-            completionInput.classList.toggle('completionManual', isManual);
+        completionInput.classList.toggle('completionManual', isManual);
 
-            // No AUTO/MANUAL text
-            completionInput.placeholder = 'השלמה לשעה';
-            }
+        // מומלץ לשנות טקסט כדי שלא יהיה בלבול:
+        completionInput.placeholder = 'מובטח לשעה';
+        }
 
         // Arrival red if gap (Arrival -> Shift Start) > 60 minutes
         const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
@@ -686,16 +686,16 @@
           const raw = String(e.target.value ?? '');
           const maybe = parseNumberOrNull(raw);
           if (raw.trim() === '') {
-            updateRow(r.id, 'completionOverride', null); // AUTO
+            updateRow(r.id, 'minPerHourOverride', null);
             return;
           }
           if (maybe == null) return; // ignore invalid while typing
-          updateRow(r.id, 'completionOverride', Math.max(0, maybe)); // MANUAL
+          updateRow(r.id, 'minPerHourOverride', Math.max(0, maybe));
         });
         inputs[6].addEventListener('blur', (e) => {
           const raw = String(e.target.value ?? '').trim();
           if (raw === '') {
-            updateRow(r.id, 'completionOverride', null); // AUTO
+            updateRow(r.id, 'minPerHourOverride', null);
             return;
           }
           const maybe = parseNumberOrNull(raw);
@@ -704,7 +704,7 @@
             recalc();
             return;
           }
-          updateRow(r.id, 'completionOverride', Math.max(0, maybe)); // MANUAL
+          updateRow(r.id, 'minPerHourOverride', Math.max(0, maybe));
         });
 
         tr.querySelector('button').addEventListener('click', ()=>removeRow(r.id));
@@ -758,7 +758,7 @@
           r.shiftEnd,
           Number(c.hours.toFixed(2)),
           Number(tipsPerHour.toFixed(2)),
-          Number(c.completionPerHour.toFixed(2)), // per-row (AUTO or MANUAL)
+          Number(c.rowMinPerHour.toFixed(2)),
           Number(c.totalTips.toFixed(2)),
           Number(c.totalWithCompletion.toFixed(2))
         ]);
