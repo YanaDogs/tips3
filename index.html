@@ -152,8 +152,8 @@
       box-shadow: 0 0 0 3px rgba(239,68,68,.18) !important;
     }
 
-    /* Manual completion input highlight */
-    .completionManual{
+    /* Per-employee min override highlight */
+    .minManual{
       border-color: rgba(124,92,255,.75) !important;
       box-shadow: 0 0 0 3px rgba(124,92,255,.18) !important;
     }
@@ -223,7 +223,7 @@
     table{
       width:100%;
       border-collapse:collapse;
-      min-width: 1280px;
+      min-width: 1520px;
     }
 
     thead th{
@@ -310,7 +310,7 @@
     <div class="header">
       <div class="brand">
         <h1>TipSplit Pro</h1>
-        <p>מחשבון טיפים למנהל בר: חלוקה לפי שעות, מותאם מובייל, כולל ייבוא/ייצוא אקסל.</p>
+        <p>חלוקת טיפים מדויקת באגורות: קודם מינימום אישי מתוך הטיפים, ואם לא מספיק – המעסיק משלים. אם יש עודף – מחולק לפי שעות.</p>
       </div>
       <div class="pill" id="todayPill">תאריך: <span class="num" id="todayText"></span></div>
     </div>
@@ -319,7 +319,7 @@
       <div class="cardHead">
         <div class="title">
           <b>הגדרות כלליות</b>
-          <span>הזן סה״כ טיפים, הזן שכר מובטח לשעה (אופציונלי), הוסף עובדים, והמערכת תחשב אוטומטית.</span>
+          <span>הזן סה״כ טיפים. הזן שכר מינימום לשעה (ברירת מחדל). לכל עובד אפשר להזין מינימום אישי (אופציונלי).</span>
         </div>
         <div class="btnRow">
           <button class="btn primary" id="installBtn" style="display:none;">⬇️ התקן אפליקציה</button>
@@ -338,16 +338,16 @@
           </div>
 
           <div class="field" style="grid-column: span 12;">
-            <label>שכר מובטח לשעה (כולל השלמה) - אופציונלי</label>
+            <label>מינימום לשעה (ברירת מחדל) - אופציונלי</label>
             <input id="minPerHour" inputmode="decimal" placeholder="לדוגמה: 100" />
           </div>
 
           <div class="inlineSummary" style="grid-column: span 12;">
             <span>סה״כ שעות: <b class="num" id="sumHours">0.00</b></span>
             <span class="dot">•</span>
-            <span>טיפים לשעה: <b class="num" id="tipsPerHour">0.00</b></span>
+            <span>טיפים לשעה (נומינלי): <b class="num" id="tipsPerHourNominal">0.00</b></span>
             <span class="dot">•</span>
-            <span>לשעה עם השלמה: <b class="num" id="withCompletionPerHour">0.00</b></span>
+            <span>השלמת מעסיק (סה״כ): <b class="num" id="sumEmployerTopup">0.00</b></span>
           </div>
         </div>
 
@@ -359,7 +359,7 @@
       <div class="cardHead">
         <div class="title">
           <b>עובדים</b>
-          <span>עמודת "השלמה לשעה" מציגה את ההשלמה הכללית. אם תערוך תא של עובד מסוים, הערך שלו יישמר לעובד הזה בלבד. מחיקת הערך תחזיר אותו לחישוב הכללי.</span>
+          <span>אלגוריתם: אם הטיפים מספיקים לכל המינימומים האישיים – נותנים מינימום לכל אחד, והעודף מתחלק לפי שעות. אם לא מספיק – הטיפים מתחלקים פרופורציונלית למינימום הנדרש, והמעסיק משלים את החסר.</span>
         </div>
       </div>
 
@@ -374,11 +374,12 @@
                 <th style="width:140px;">שעת הגעה</th>
                 <th style="width:140px;">עליה למשמרת</th>
                 <th style="width:140px;">ירידה ממשמרת</th>
-                <th style="width:130px;">סה״כ שעות</th>
-                <th style="width:140px;">טיפים לשעה</th>
-                <th style="width:160px;">השלמה לשעה</th>
-                <th style="width:170px;">סכום טיפים לעובד</th>
-                <th style="width:190px;">סכום כולל עם השלמה</th>
+                <th style="width:120px;">מינימום לשעה</th>
+                <th style="width:110px;">סה״כ שעות</th>
+                <th style="width:150px;">מינימום לשכר</th>
+                <th style="width:160px;">טיפים מהקופה</th>
+                <th style="width:150px;">השלמת מעסיק</th>
+                <th style="width:170px;">סה״כ שכר</th>
                 <th style="width:120px;">פעולות</th>
               </tr>
             </thead>
@@ -387,7 +388,8 @@
         </div>
 
         <div class="status">
-          הערה: אם הירידה מוקדמת מהעליה, המערכת מניחה שהמשמרת עברה חצות (למשל 22:00 → 03:00).
+          הערה: אם הירידה מוקדמת מהעליה, המערכת מניחה שהמשמרת עברה חצות (למשל 22:00 → 03:00).<br>
+          הערה כספית: כל החישובים מתבצעים באגורות, והעיגול מבוצע כך שסכום הטיפים המחולק תמיד שווה בדיוק לסה״כ הטיפים שהוזן.
         </div>
       </div>
     </div>
@@ -413,6 +415,15 @@
       el('todayText').textContent = `${dd}.${mm}.${yyyy}`;
     }
 
+    function escapeHtml(s){
+      return String(s ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#039;');
+    }
+
     function parseNumber(v) {
       if (v == null) return 0;
       const s = String(v).trim().replace(/,/g,'');
@@ -435,6 +446,17 @@
       return x.toFixed(2);
     }
 
+    function moneyToCents(n){
+      const x = Number(n);
+      if (!Number.isFinite(x)) return 0;
+      return Math.max(0, Math.round(x * 100));
+    }
+    function centsToMoney(c){
+      const x = Number(c);
+      if (!Number.isFinite(x)) return 0;
+      return x / 100;
+    }
+
     function autoColonWhileTyping(raw) {
       const digits = String(raw ?? '').replace(/\D/g, '').slice(0, 4);
       if (digits.length <= 2) return digits;
@@ -444,17 +466,13 @@
     function normalizeOnBlurToHHMM(raw) {
       let s = String(raw ?? '').trim();
       if (!s) return '';
-
       if (/^\d+$/.test(s)) s = autoColonWhileTyping(s);
-
       const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
       if (!m) return '';
-
       const hh = Number(m[1]);
       const mm = Number(m[2]);
       if (!Number.isInteger(hh) || !Number.isInteger(mm)) return '';
       if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
-
       return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
     }
 
@@ -469,13 +487,17 @@
       return hh*60 + mm;
     }
 
-    function calcDurationHours(startHHMM, endHHMM) {
+    function calcDurationMinutes(startHHMM, endHHMM) {
       const a = timeToMinutes(startHHMM);
       const b = timeToMinutes(endHHMM);
       if (a == null || b == null) return 0;
       let diff = b - a;
       if (diff < 0) diff += 24*60;
-      return diff / 60;
+      return diff;
+    }
+
+    function calcDurationHours(startHHMM, endHHMM) {
+      return calcDurationMinutes(startHHMM, endHHMM) / 60;
     }
 
     // Minutes forward from "from" to "to" (supports crossing midnight)
@@ -497,11 +519,7 @@
         arrival: data.arrival || '',
         shiftStart: data.shiftStart || '',
         shiftEnd: data.shiftEnd || '',
-
-        // Completion override per employee:
-        // If completionOverride is null => AUTO (use global completionPerHour)
-        // If completionOverride is a number => MANUAL (use this number)
-        minPerHourOverride: (data.minPerHourOverride ?? null) // null => use global minPerHour
+        minPerHourOverride: (data.minPerHourOverride ?? null) // null => use global
       };
       state.rows.push(row);
       renderRows();
@@ -521,38 +539,136 @@
       recalc();
     }
 
-    function getRowMinPerHour(r, globalMinPerHour) {
-        return (r.minPerHourOverride == null) ? globalMinPerHour : Math.max(0, r.minPerHourOverride);
+    function largestRemainderAllocate(totalCents, weights){
+      // weights: array of non-negative integers
+      const sumW = weights.reduce((a,b)=>a+b,0);
+      const n = weights.length;
+      const alloc = new Array(n).fill(0);
+
+      if (n === 0) return alloc;
+      if (totalCents <= 0) return alloc;
+      if (sumW <= 0) {
+        // if no weights, split equally by remainder method
+        const base = Math.floor(totalCents / n);
+        let rem = totalCents - base*n;
+        for (let i=0;i<n;i++) alloc[i] = base;
+        for (let i=0;i<rem;i++) alloc[i] += 1;
+        return alloc;
+      }
+
+      const parts = [];
+      let used = 0;
+      for (let i=0;i<n;i++){
+        const exactNum = totalCents * weights[i]; // integer
+        const base = Math.floor(exactNum / sumW);
+        const rem = exactNum - base*sumW; // remainder in [0, sumW)
+        alloc[i] = base;
+        used += base;
+        parts.push({ i, rem });
+      }
+
+      let left = totalCents - used;
+      parts.sort((a,b)=>b.rem - a.rem);
+
+      for (let k=0; k<left; k++){
+        alloc[parts[k % parts.length].i] += 1;
+      }
+      return alloc;
+    }
+
+    function computeAndAllocate(){
+      const totalTipsMoney = parseNumber(el('totalTips').value);
+      const totalTipsCents = moneyToCents(totalTipsMoney);
+
+      const globalMinMoney = parseNumber(el('minPerHour').value);
+      const globalRateCentsPerHour = moneyToCents(globalMinMoney); // rate cents/hour
+
+      // Build per-row computed base data
+      const rowsData = state.rows.map((r) => {
+        const minutes = calcDurationMinutes(r.shiftStart, r.shiftEnd);
+
+        const overrideMoney = (r.minPerHourOverride == null) ? null : Math.max(0, Number(r.minPerHourOverride));
+        const rateCentsPerHour = (overrideMoney == null) ? globalRateCentsPerHour : moneyToCents(overrideMoney);
+
+        // Minimum total in cents = ceil(minutes * rate / 60)
+        const minNumer = minutes * rateCentsPerHour; // cents*minutes/hour? actually cents-per-hour * minutes
+        const minTotalCents = (minutes > 0 && rateCentsPerHour > 0) ? Math.ceil(minNumer / 60) : 0;
+
+        return {
+          id: r.id,
+          minutes,
+          hours: minutes / 60,
+          rateCentsPerHour,
+          minTotalCents,
+          minWeightNumer: minNumer // for proportional allocation when 부족
+        };
+      });
+
+      const totalMinutes = rowsData.reduce((a,x)=>a + x.minutes, 0);
+      const sumMinCents = rowsData.reduce((a,x)=>a + x.minTotalCents, 0);
+
+      // Allocation outputs
+      const tipsAllocCents = new Array(rowsData.length).fill(0);
+      const employerTopupCents = new Array(rowsData.length).fill(0);
+
+      if (rowsData.length === 0 || totalTipsCents <= 0) {
+        for (let i=0;i<rowsData.length;i++){
+          employerTopupCents[i] = rowsData[i].minTotalCents; // if you want to show required; but with 0 tips
+        }
+      } else if (totalTipsCents >= sumMinCents) {
+        // Case A: enough tips to cover all minima
+        for (let i=0;i<rowsData.length;i++){
+          tipsAllocCents[i] = rowsData[i].minTotalCents;
+        }
+        const remaining = totalTipsCents - sumMinCents;
+
+        if (remaining > 0) {
+          const weights = rowsData.map(x => x.minutes); // by hours -> by minutes
+          const extra = largestRemainderAllocate(remaining, weights);
+          for (let i=0;i<rowsData.length;i++){
+            tipsAllocCents[i] += extra[i];
+          }
         }
 
-        function rowComputed(r, tipsPerHour, globalMinPerHour) {
-        const hours = calcDurationHours(r.shiftStart, r.shiftEnd);
-
-        const rowMinPerHour = getRowMinPerHour(r, globalMinPerHour);
-        const perHourWithCompletion = Math.max(tipsPerHour, rowMinPerHour);
-        const completionPerHour = Math.max(0, rowMinPerHour - tipsPerHour);
-
-        const totalTips = hours * tipsPerHour;
-        const totalWithCompletion = hours * perHourWithCompletion;
-
-        return { hours, totalTips, totalWithCompletion, completionPerHour, perHourWithCompletion, rowMinPerHour };
+        // No employer topup needed
+        for (let i=0;i<rowsData.length;i++){
+          employerTopupCents[i] = 0;
         }
+      } else {
+        // Case B: not enough tips -> distribute tips proportionally to required minima (minWeightNumer)
+        // Use weights as minTotalCents (already ceil'd) to keep fairness in currency space,
+        // but if all minima are zero, fall back to minutes.
+        let weights = rowsData.map(x => x.minTotalCents);
+        const sumW = weights.reduce((a,b)=>a+b,0);
+        if (sumW <= 0) weights = rowsData.map(x => x.minutes);
+
+        const alloc = largestRemainderAllocate(totalTipsCents, weights);
+        for (let i=0;i<rowsData.length;i++){
+          tipsAllocCents[i] = alloc[i];
+          employerTopupCents[i] = Math.max(0, rowsData[i].minTotalCents - tipsAllocCents[i]);
+        }
+      }
+
+      return {
+        totalTipsCents,
+        globalRateCentsPerHour,
+        totalMinutes,
+        totalHours: totalMinutes / 60,
+        sumMinCents,
+        tipsAllocCents,
+        employerTopupCents,
+        rowsData
+      };
+    }
 
     function recalc() {
       const totalTips = parseNumber(el('totalTips').value);
-      const minPerHour = parseNumber(el('minPerHour').value);
-
-      let totalHours = 0;
-      for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
-
-      const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
-      const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
-      const globalCompletionPerHour = Math.max(0, minPerHour - tipsPerHour);
+      const globalMin = parseNumber(el('minPerHour').value);
 
       const issues = [];
       if (state.rows.length === 0) issues.push('אין עובדים בטבלה. הוסף לפחות עובד אחד.');
-      if (totalTips <= 0) issues.push('סה״כ טיפים כולל הוא 0 או לא תקין. הזן מספר.');
-      if (minPerHour < 0) issues.push('שכר מובטח לשעה לא יכול להיות שלילי.');
+      if (totalTips < 0) issues.push('סה״כ טיפים לא יכול להיות שלילי.');
+      if (globalMin < 0) issues.push('מינימום לשעה לא יכול להיות שלילי.');
 
       for (let i=0;i<state.rows.length;i++){
         const r = state.rows[i];
@@ -560,43 +676,71 @@
         if (r.shiftStart && timeToMinutes(r.shiftStart) == null) issues.push(`שורת עובד ${i+1}: "עליה למשמרת" בפורמט לא תקין (HH:MM).`);
         if (r.shiftEnd && timeToMinutes(r.shiftEnd) == null) issues.push(`שורת עובד ${i+1}: "ירידה ממשמרת" בפורמט לא תקין (HH:MM).`);
         if (r.arrival && timeToMinutes(r.arrival) == null) issues.push(`שורת עובד ${i+1}: "שעת הגעה" בפורמט לא תקין (HH:MM).`);
-        if (r.completionOverride != null && (!Number.isFinite(r.completionOverride) || r.completionOverride < 0)) issues.push(`שורת עובד ${i+1}: "השלמה לשעה" ידנית לא תקינה (חייב להיות מספר >= 0).`);
+        if (r.minPerHourOverride != null && (!Number.isFinite(Number(r.minPerHourOverride)) || Number(r.minPerHourOverride) < 0)) {
+          issues.push(`שורת עובד ${i+1}: "מינימום לשעה" אישי לא תקין (חייב להיות מספר >= 0).`);
+        }
       }
 
-      if (el('sumHours')) el('sumHours').textContent = fmt2(totalHours);
-      if (el('tipsPerHour')) el('tipsPerHour').textContent = fmt2(tipsPerHour);
-      if (el('withCompletionPerHour')) el('withCompletionPerHour').textContent = fmt2(withCompletionPerHour);
+      const alloc = computeAndAllocate();
+
+      const sumHoursEl = el('sumHours');
+      const tipsPerHourNominalEl = el('tipsPerHourNominal');
+      const sumEmployerTopupEl = el('sumEmployerTopup');
+
+      const totalHours = alloc.totalHours || 0;
+      const tipsPerHourNominal = (totalHours > 0) ? (centsToMoney(alloc.totalTipsCents) / totalHours) : 0;
+
+      if (sumHoursEl) sumHoursEl.textContent = fmt2(totalHours);
+      if (tipsPerHourNominalEl) tipsPerHourNominalEl.textContent = fmt2(tipsPerHourNominal);
+
+      const topupSum = alloc.employerTopupCents.reduce((a,b)=>a+b,0);
+      if (sumEmployerTopupEl) sumEmployerTopupEl.textContent = fmt2(centsToMoney(topupSum));
 
       el('statusText').textContent =
         issues.length === 0
-          ? 'מוכן. "השלמה לשעה" היא AUTO לפי השכר המובטח, אלא אם הזנת ערך ידני לעובד ספציפי (MANUAL). מחיקת הערך מחזירה ל-AUTO.'
+          ? (
+              alloc.totalTipsCents >= alloc.sumMinCents
+                ? 'מצב: יש מספיק טיפים כדי לכסות את כל המינימומים האישיים. קודם מינימום לכל עובד, והעודף מתחלק לפי שעות.'
+                : 'מצב: אין מספיק טיפים כדי לכסות את כל המינימומים האישיים. הטיפים מתחלקים פרופורציונלית למינימום הנדרש, והמעסיק משלים את החסר.'
+            )
           : issues.join(' ');
 
       const tbody = el('rows');
       for (const tr of tbody.querySelectorAll('tr[data-id]')) {
         const id = tr.getAttribute('data-id');
-        const r = state.rows.find(x => x.id === id);
-        if (!r) continue;
+        const idx = state.rows.findIndex(x => x.id === id);
+        if (idx < 0) continue;
 
-        const c = rowComputed(r, tipsPerHour, minPerHour);
+        const r = state.rows[idx];
+        const rd = alloc.rowsData[idx];
 
-        tr.querySelector('[data-col="hours"]').textContent = fmt2(c.hours);
-        tr.querySelector('[data-col="tipsPerHour"]').textContent = fmt2(tipsPerHour);
-        tr.querySelector('[data-col="totalTips"]').textContent = fmt2(c.totalTips);
-        tr.querySelector('[data-col="totalWithCompletion"]').textContent = fmt2(c.totalWithCompletion);
+        const tipsC = alloc.tipsAllocCents[idx] || 0;
+        const topupC = alloc.employerTopupCents[idx] || 0;
+        const totalPayC = tipsC + topupC;
 
-        // Completion input: AUTO shows global and stays synced; MANUAL keeps its value
-        const completionInput = tr.querySelector('input[data-role="completion"]');
-        if (completionInput) {
-        const isManual = (r.minPerHourOverride != null);
+        tr.querySelector('[data-col="hours"]').textContent = fmt2(rd.hours);
+        tr.querySelector('[data-col="minTotal"]').textContent = fmt2(centsToMoney(rd.minTotalCents));
+        tr.querySelector('[data-col="tipsFromPool"]').textContent = fmt2(centsToMoney(tipsC));
+        tr.querySelector('[data-col="employerTopup"]').textContent = fmt2(centsToMoney(topupC));
+        tr.querySelector('[data-col="totalPay"]').textContent = fmt2(centsToMoney(totalPayC));
 
-        // מציג את המובטח לשעה (גלובלי או אישי) – בדיוק “כפי שהוזן”
-        completionInput.value = fmt2(isManual ? Math.max(0, r.minPerHourOverride) : minPerHour);
+        // Per-row min input UI
+        // Per-row min input UI
+        const minInput = tr.querySelector('input[data-role="minPerHour"]');
+        if (minInput) {
+        const isManual = (r.minPerHourOverride != null && String(r.minPerHourOverride).trim() !== '');
 
-        completionInput.classList.toggle('completionManual', isManual);
+        // אם אין override אישי, נציג את ברירת המחדל בשדה (לנראות),
+        // אבל לא נכתוב אותה ל-state ולכן זה נשאר AUTO.
+        if (!isManual) {
+            const globalMinMoney = parseNumber(el('minPerHour').value);
+            minInput.value = (globalMinMoney > 0) ? fmt2(globalMinMoney) : '';
+        } else {
+            minInput.value = fmt2(Math.max(0, Number(r.minPerHourOverride)));
+        }
 
-        // מומלץ לשנות טקסט כדי שלא יהיה בלבול:
-        completionInput.placeholder = 'מובטח לשעה';
+        minInput.classList.toggle('minManual', isManual);
+        minInput.placeholder = 'ברירת מחדל';
         }
 
         // Arrival red if gap (Arrival -> Shift Start) > 60 minutes
@@ -624,13 +768,12 @@
           <td><input data-role="arrival" value="${escapeHtml(r.arrival)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td><input value="${escapeHtml(r.shiftStart)}" placeholder="HH:MM" inputmode="numeric" /></td>
           <td><input value="${escapeHtml(r.shiftEnd)}" placeholder="HH:MM" inputmode="numeric" /></td>
+          <td><input class="cellInput" data-role="minPerHour" value="" inputmode="decimal" placeholder="ברירת מחדל" /></td>
           <td class="num" data-col="hours">0.00</td>
-          <td class="num" data-col="tipsPerHour">0.00</td>
-          <td>
-            <input class="cellInput" data-role="completion" inputmode="numeric" placeholder="השלמה לשעה" />
-          </td>
-          <td class="num" data-col="totalTips">0.00</td>
-          <td class="num" data-col="totalWithCompletion">0.00</td>
+          <td class="num" data-col="minTotal">0.00</td>
+          <td class="num" data-col="tipsFromPool">0.00</td>
+          <td class="num" data-col="employerTopup">0.00</td>
+          <td class="num" data-col="totalPay">0.00</td>
           <td>
             <div class="rowControls">
               <button class="btn mini danger" type="button">מחק</button>
@@ -639,7 +782,7 @@
         `;
 
         const inputs = tr.querySelectorAll('input');
-        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd,6=completion
+        // mapping: 0=date,1=firstName,2=lastName,3=arrival,4=shiftStart,5=shiftEnd,6=minPerHour
         inputs[0].addEventListener('input', (e)=>updateRow(r.id,'date', e.target.value));
         inputs[1].addEventListener('input', (e)=>updateRow(r.id,'firstName', e.target.value));
         inputs[2].addEventListener('input', (e)=>updateRow(r.id,'lastName', e.target.value));
@@ -680,15 +823,15 @@
           updateRow(r.id, 'shiftEnd', e.target.value);
         });
 
-        // Completion override (AUTO/MANUAL)
-        // If user clears => AUTO (null). If user types a number => MANUAL (that number)
+        // Per-employee min per hour override:
+        // empty => null (use global), number => override
         inputs[6].addEventListener('input', (e) => {
-          const raw = String(e.target.value ?? '');
-          const maybe = parseNumberOrNull(raw);
-          if (raw.trim() === '') {
+          const raw = String(e.target.value ?? '').trim();
+          if (raw === '') {
             updateRow(r.id, 'minPerHourOverride', null);
             return;
           }
+          const maybe = parseNumberOrNull(raw);
           if (maybe == null) return; // ignore invalid while typing
           updateRow(r.id, 'minPerHourOverride', Math.max(0, maybe));
         });
@@ -700,8 +843,7 @@
           }
           const maybe = parseNumberOrNull(raw);
           if (maybe == null) {
-            // revert to current state display on recalc
-            recalc();
+            recalc(); // revert display
             return;
           }
           updateRow(r.id, 'minPerHourOverride', Math.max(0, maybe));
@@ -712,25 +854,8 @@
       });
     }
 
-    function escapeHtml(s){
-      return String(s ?? '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'",'&#039;');
-    }
-
     function exportToExcel() {
-      const totalTips = parseNumber(el('totalTips').value);
-      const minPerHour = parseNumber(el('minPerHour').value);
-
-      let totalHours = 0;
-      for (const r of state.rows) totalHours += calcDurationHours(r.shiftStart, r.shiftEnd);
-
-      const tipsPerHour = (totalHours > 0) ? (totalTips / totalHours) : 0;
-      const withCompletionPerHour = Math.max(tipsPerHour, minPerHour);
-      const globalCompletionPerHour = Math.max(0, minPerHour - tipsPerHour);
+      const alloc = computeAndAllocate();
 
       const data = [];
       data.push([
@@ -740,15 +865,22 @@
         'Arrival',
         'Shift Start',
         'Shift End',
+        'Min Per Hour (Override or blank)',
         'Total Hours',
-        'Tips Per Hour',
-        'Completion Per Hour',
-        'Total Tips For Employee',
-        'Total With Completion'
+        'Min Total Pay',
+        'Tips From Pool',
+        'Employer Topup',
+        'Total Pay'
       ]);
 
-      for (const r of state.rows) {
-        const c = rowComputed(r, tipsPerHour, globalCompletionPerHour);
+      for (let i=0;i<state.rows.length;i++){
+        const r = state.rows[i];
+        const rd = alloc.rowsData[i];
+
+        const tipsC = alloc.tipsAllocCents[i] || 0;
+        const topupC = alloc.employerTopupCents[i] || 0;
+        const totalPayC = tipsC + topupC;
+
         data.push([
           r.date,
           r.firstName,
@@ -756,31 +888,33 @@
           r.arrival,
           r.shiftStart,
           r.shiftEnd,
-          Number(c.hours.toFixed(2)),
-          Number(tipsPerHour.toFixed(2)),
-          Number(c.rowMinPerHour.toFixed(2)),
-          Number(c.totalTips.toFixed(2)),
-          Number(c.totalWithCompletion.toFixed(2))
+          (r.minPerHourOverride == null ? '' : Number(r.minPerHourOverride)),
+          Number(rd.hours.toFixed(2)),
+          Number(centsToMoney(rd.minTotalCents).toFixed(2)),
+          Number(centsToMoney(tipsC).toFixed(2)),
+          Number(centsToMoney(topupC).toFixed(2)),
+          Number(centsToMoney(totalPayC).toFixed(2))
         ]);
       }
 
       data.push([]);
-      data.push(['TOTAL TIPS', Number(totalTips.toFixed(2))]);
-      data.push(['TOTAL HOURS', Number(totalHours.toFixed(2))]);
-      data.push(['TIPS PER HOUR', Number(tipsPerHour.toFixed(2))]);
-      data.push(['GLOBAL COMPLETION PER HOUR (AUTO)', Number(globalCompletionPerHour.toFixed(2))]);
-      data.push(['MIN PER HOUR', Number(minPerHour.toFixed(2))]);
-      data.push(['WITH COMPLETION PER HOUR', Number(withCompletionPerHour.toFixed(2))]);
+      data.push(['TOTAL TIPS', Number(centsToMoney(alloc.totalTipsCents).toFixed(2))]);
+      data.push(['TOTAL HOURS', Number(alloc.totalHours.toFixed(2))]);
+      data.push(['DEFAULT MIN PER HOUR', Number(centsToMoney(alloc.globalRateCentsPerHour).toFixed(2))]);
+      data.push(['SUM MIN TOTAL', Number(centsToMoney(alloc.sumMinCents).toFixed(2))]);
+      const topupSum = alloc.employerTopupCents.reduce((a,b)=>a+b,0);
+      data.push(['EMPLOYER TOPUP TOTAL', Number(centsToMoney(topupSum).toFixed(2))]);
 
       const ws = XLSX.utils.aoa_to_sheet(data);
 
       // Color "Arrival" cell red when gap > 60 minutes (Excel)
+      // Arrival column index: 3 (0-based). Data rows start at excel row 2 (1-based)
       for (let i = 0; i < state.rows.length; i++) {
         const r = state.rows[i];
         const gap = forwardMinutesDiff(r.arrival, r.shiftStart);
         if (gap != null && gap > 60) {
-          const excelRow = 2 + i; // header row 1
-          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 }); // Arrival col=3
+          const excelRow = 2 + i;
+          const cellAddress = XLSX.utils.encode_cell({ c: 3, r: excelRow - 1 });
           if (!ws[cellAddress]) continue;
 
           ws[cellAddress].s = ws[cellAddress].s || {};
@@ -790,12 +924,12 @@
         }
       }
 
-      // Highlight MANUAL completion cells (Completion col = 8) in Excel
+      // Highlight per-employee manual min cells (col=6)
       for (let i = 0; i < state.rows.length; i++) {
         const r = state.rows[i];
-        if (r.completionOverride == null) continue; // AUTO => no highlight
+        if (r.minPerHourOverride == null) continue;
         const excelRow = 2 + i;
-        const cellAddress = XLSX.utils.encode_cell({ c: 8, r: excelRow - 1 }); // Completion col=8
+        const cellAddress = XLSX.utils.encode_cell({ c: 6, r: excelRow - 1 });
         if (!ws[cellAddress]) continue;
 
         ws[cellAddress].s = ws[cellAddress].s || {};
@@ -834,13 +968,15 @@
         for (let i=1;i<rows.length;i++){
           const r = rows[i];
           if (!r || r.length === 0) break;
+
           const firstCell = String(r[0] ?? '').trim();
           if (!firstCell) break;
-          if (firstCell.toUpperCase() === 'TOTAL TIPS') break;
 
-          // Supports older files: Completion might not exist
-          const completionCell = (r.length > 8) ? r[8] : null;
-          const completionOverride = parseNumberOrNull(completionCell);
+          const k = String(r[0] ?? '').trim().toUpperCase();
+          if (k === 'TOTAL TIPS') break;
+
+          const minOverrideCell = (r.length > 6) ? r[6] : null;
+          const minOverride = parseNumberOrNull(minOverrideCell);
 
           imported.push({
             date: String(r[0] ?? ''),
@@ -849,26 +985,28 @@
             arrival: String(r[3] ?? ''),
             shiftStart: String(r[4] ?? ''),
             shiftEnd: String(r[5] ?? ''),
-            completionOverride: (completionOverride == null ? null : Math.max(0, completionOverride))
+            minPerHourOverride: (minOverride == null ? null : Math.max(0, minOverride))
           });
         }
 
         let totalTips = 0;
-        let minPerHour = 0;
+        let defaultMin = 0;
 
         for (let i=0;i<rows.length;i++){
           const r = rows[i];
           if (!r || r.length < 2) continue;
           const k = String(r[0] ?? '').trim().toUpperCase();
           if (k === 'TOTAL TIPS') totalTips = parseNumber(r[1]);
-          if (k === 'MIN PER HOUR') minPerHour = parseNumber(r[1]);
+          if (k === 'DEFAULT MIN PER HOUR') defaultMin = parseNumber(r[1]);
+          // Backward compat:
+          if (k === 'MIN PER HOUR') defaultMin = parseNumber(r[1]);
         }
 
         state.rows = [];
         imported.forEach(x => addRow(x));
 
-        if (totalTips) el('totalTips').value = String(totalTips);
-        if (minPerHour) el('minPerHour').value = String(minPerHour);
+        if (Number.isFinite(totalTips) && totalTips > 0) el('totalTips').value = String(totalTips);
+        if (Number.isFinite(defaultMin) && defaultMin > 0) el('minPerHour').value = String(defaultMin);
 
         renderRows();
         recalc();
